@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>音频动态效果</title>
+	<style>
+		#audio-player {
+			width: 400px;
+			height: 270px;
+			margin: 50px auto;
+			background-color: #f0f0f0;
+			border-radius: 10px;
+			padding: 20px;
+			text-align: center;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		#audio-visualizer {
+			width: 100%;
+			height: 100px;
+			margin-top: 20px;
+			background-color: #fff;
+			border: 1px solid #ccc;
+			border-radius: 5px;
+			position: relative;
+			overflow: hidden;
+			display: flex;
+			align-items: flex-end;
+		}
+
+		.visualizer-bar {
+			width: 3px;
+			height: 0;
+			background-color: #ff7800;
+			transform-origin: bottom center;
+			animation: visualizer-animation 300ms linear infinite;
+		}
+
+		@keyframes visualizer-animation {
+			from {
+				transform: scaleY(0);
+			}
+
+			to {
+				transform: scaleY(1);
+			}
+		}
+
+		.audio-info {
+			display: flex;
+			justify-content: space-between;
+			margin-top: 20px;
+			width: 100%;
+		}
+
+		.audio-info span {
+			flex-grow: 1;
+			text-align: center;
+		}
+
+		.dropzone {
+			width: 100%;
+			height: 50px;
+			margin-top: 10px;
+			margin-bottom: 10px;
+			background-color: #f0f0f0;
+			border: 1px dashed #ccc;
+			border-radius: 5px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			font-size: 16px;
+		}
+
+		.dropzone.active {
+			background-color: #e0e0e0;
+		}
+
+		#progress-bar {
+			width: 100%;
+			height: 5px;
+			background-color: #e0e0e0;
+			margin-top: 10px;
+		}
+
+		#played {
+			position: relative;
+			height: 100%;
+			width: 0;
+			background-color: #8bc34a;
+		}
+
+
+		button {
+			width: 100px;
+			height: 30px;
+			background-color: #fff;
+			border: 1px solid #ccc;
+			border-radius: 5px;
+			font-size: 14px;
+			cursor: pointer;
+		}
+
+		button:hover {
+			background-color: #f0f0f0;
+		}
+
+		button:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		body {
+			background-color: gray;
+			background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.2) 75%, rgba(255, 255, 255, 0.2));
+			background-size: 100px 100px;
+		}
+
+		body::before {
+			content: "";
+			position: absolute;
+			top: 0px;
+			bottom: 0px;
+			left: 0px;
+			right: 0px;
+			z-index: -1;
+			background: inherit;
+			filter: blur(10px);
+		}
+	</style>
+</head>
+
+<body>
+	<div id="audio-player">
+		<audio id="audio"></audio>
+		<div class="audio-info">
+			<span id="filename">没有选择音频文件</span>
+			<span>
+				<span id="current-time">00:00</span>
+				/
+				<span id="duration">00:00</span>
+			</span>
+
+		</div>
+		<div id="progress-bar">
+			<div id="played"></div>
+		</div>
+		<div id="audio-visualizer"></div>
+		<div class="dropzone" id="dropzone">拖拽音频文件到这里</div>
+		<button id="play-pause-button" disabled>播放</button>
+	</div>
+
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script>
+		var audioElement = document.getElementById('audio');
+		var filename = '';
+		var duration = '';
+		var isPlaying = false;
+		var canvas = document.createElement('canvas');
+		var canvasCtx = canvas.getContext('2d');
+		var visualizerBars = [];
+		var analyser;
+		const intervalTime = 1000; // 颜色更换间隔时间（单位：毫秒）
+		let lastUpdateTime = 0;
+		// 定义初始角度
+		let angle = 45;
+		let r = 255;
+		let g = 255;
+		let b = 255;
+
+
+		var progressBar = document.getElementById('progress-bar');
+		var playedBar = document.getElementById('played');
+		var currentTimeSpan = document.getElementById('current-time');
+
+		// 更新播放进度条
+		function updateProgressBar() {
+			var percentage = (audioElement.currentTime / audioElement.duration) * 100;
+			playedBar.style.width = percentage + '%';
+			currentTimeSpan.textContent = formatTime(audioElement.currentTime);
+		}
+
+		// 监听时间更新事件
+		audioElement.addEventListener('timeupdate', function () {
+			updateProgressBar();
+			// 获取当前播放时间
+			const currentTime = Math.floor(audioElement.currentTime);
+
+			// 判断是否到达下一个颜色更换时间
+			if (currentTime - lastUpdateTime >= intervalTime / 1000) {
+				// 更新上次更新时间
+				lastUpdateTime = currentTime;
+
+
+				// 生成暗色系颜色
+				// const r = Math.floor(Math.random() * 128);
+				// const g = Math.floor(Math.random() * 128);
+				// const b = Math.floor(Math.random() * 128);
+
+				// 拼接成 RGB 颜色值
+				// const color = `rgb(${r}, ${g}, ${b})`;
+				// document.body.style.backgroundColor = color;
+			}
+		});
+
+		// 定义更新角度的函数
+		function updateAngle() {
+			// 修改角度
+			angle += 1;
+			if(angle >= 945){
+				angle = 46;
+			}
+			// 更新CSS样式
+			document.body.style.backgroundImage = `linear-gradient(${angle}deg, rgba(${r}, ${g}, ${b}, 0.2) 25%, transparent 25%, transparent 75%, rgba(${r}, ${g}, ${b}, 0.2) 75%, rgba(${r}, ${g}, ${b}, 0.2))`;
+
+			if (isPlaying) {
+				// 循环调用updateAngle函数
+				setTimeout(updateAngle, 10);
+			}
+
+		}
+
+		function random(){
+			r = Math.floor(Math.random() * 255);
+			g = Math.floor(Math.random() * 255);
+			b = Math.floor(Math.random() * 255);
+			if (isPlaying) {
+				setTimeout(random, 1500);
+			}
+		}
+
+
+		// 监听拖动进度条事件
+		progressBar.addEventListener('click', function (event) {
+			var rect = progressBar.getBoundingClientRect();
+			var x = event.clientX - rect.left;
+			var width = rect.right - rect.left;
+			var percentage = (x / width);
+			audioElement.currentTime = audioElement.duration * percentage;
+		});
+
+
+
+		// 设置画布大小
+		function setCanvasSize() {
+			canvas.width = $('#audio-visualizer').width();
+			canvas.height = $('#audio-visualizer').height();
+		}
+
+		// 创建音频图条
+		function createVisualizerBars() {
+			var barWidth = canvas.width / 128;
+			for (var i = 0; i < 128; i++) {
+				var bar = $('<div>').addClass('visualizer-bar').css({
+					width: barWidth + 'px',
+					left: (i * barWidth) + 'px'
+				});
+				visualizerBars.push(bar);
+			}
+		}
+
+		// 更新音频图
+		function updateVisualizer(analyser) {
+			canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+			canvasCtx.fillStyle = '#ff7800';
+			var bufferLength = analyser.frequencyBinCount;
+			var dataArray = new Uint8Array(bufferLength);
+
+			analyser.getByteFrequencyData(dataArray);
+			var barWidth = canvas.width / 128;
+			for (var i = 0; i < visualizerBars.length; i++) {
+				var bar = visualizerBars[i];
+				var barHeight = dataArray[i] * canvas.height / 256;
+				bar.css({
+					height: barHeight + 'px',
+					transform: 'scaleY(' + barHeight / parseInt(bar.css('height')) + ')'
+				});
+				canvasCtx.fillRect(i * barWidth, canvas.height - barHeight, barWidth, barHeight);
+			}
+			requestAnimationFrame(function () { updateVisualizer(analyser); });
+		}
+
+		// 拖拽文件到页面
+		$('html').on('dragover', function (e) {
+			e.preventDefault();
+			$('#dropzone').addClass('active');
+		}).on('dragleave', function (e) {
+			e.preventDefault();
+			$('#dropzone').removeClass('active');
+		}).on('drop', function (e) {
+			e.preventDefault();
+			var file = e.originalEvent.dataTransfer.files;
+			if (file.length > 0) {
+				file = file[0];
+				filename = file.name;
+				$('#filename').text(filename);
+				audioElement.src = URL.createObjectURL(file);
+				audioElement.addEventListener('loadedmetadata', function () {
+					duration = formatTime(audioElement.duration);
+					$('#duration').text(duration);
+				});
+				$('#play-pause-button').prop('disabled', false).text('播放');
+
+				// 初始化 AnalyserNode
+				var audioContext = new AudioContext();
+				var audioElementSource = audioContext.createMediaElementSource(audioElement);
+				analyser = audioContext.createAnalyser();
+				audioElementSource.connect(analyser);
+				analyser.connect(audioContext.destination);
+
+				setCanvasSize();
+				createVisualizerBars();
+				updateVisualizer(analyser);
+				isPlaying = false;
+			}
+			$('#dropzone').removeClass('active');
+		});
+
+		// 播放或暂停音频
+		$('#play-pause-button').on('click', function () {
+			if (!isPlaying) {
+				audioElement.play();
+				$(this).text('暂停');
+				isPlaying = true;
+				updateAngle();
+				random();
+			} else {
+				audioElement.pause();
+				$(this).text('播放');
+				isPlaying = false;
+			}
+		});
+
+		// 监听播放结束事件
+		audioElement.addEventListener('ended', function () {
+			$('#play-pause-button').text('播放');
+			isPlaying = false;
+		});
+
+		// 格式化时间
+		function formatTime(time) {
+			var minutes = Math.floor(time / 60);
+			var seconds = Math.floor(time % 60);
+			seconds = seconds < 10 ? '0' + seconds : seconds;
+			return minutes + ':' + seconds;
+		}
+
+		// 将 canvas 添加到文档中
+		// $(document.body).append(canvas);
+		$('#audio-visualizer').append(canvas);
+
+		// 在窗口大小变化时重新设置 canvas 大小
+		$(window).on('resize', function () {
+			setCanvasSize();
+		});
+
+
+	</script>
+</body>
+
+</html>
